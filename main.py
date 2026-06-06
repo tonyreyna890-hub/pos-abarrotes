@@ -1,145 +1,131 @@
 from fastapi import FastAPI, Depends, HTTPException
-from fastapi.responses import FileResponse  # <-- ¡AGREGA ESTA LÍNEA AQUÍ ARRIBA!
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from sqlalchemy import Column, String, Float, Integer, DateTime
-from sqlalchemy.orm import Session
-from sqlalchemy.sql import func
-from database import Base, engine, obtener_db
-app = FastAPI()
+from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, or_
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime
 
-# ==========================================
-# MODELOS DE LAS TABLAS (SQL)
-# ==========================================
+DATABASE_URL = "sqlite:///./tienda.db"
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
 class ProductoTabla(Base):
     __tablename__ = "productos"
-    
     codigo_barras = Column(String, primary_key=True, index=True)
     nombre = Column(String, nullable=False)
-    precio = Column(Float, nullable=False)
-    stock = Column(Integer, nullable=False)
+    precio_venta = Column(Float, nullable=False)
+    existencia = Column(Integer, nullable=False)
 
 class VentaTabla(Base):
     __tablename__ = "ventas"
-    
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    codigo_barras = Column(String, nullable=False)
-    nombre_producto = Column(String, nullable=False)
-    cantidad = Column(Integer, nullable=False)
+    fecha = Column(DateTime, default=datetime.now)
     total = Column(Float, nullable=False)
-    fecha_hora = Column(DateTime, default=func.now())
+    productos_vendidos = Column(String, nullable=False)
 
 Base.metadata.create_all(bind=engine)
 
-class FormatoProducto(BaseModel):
+class ProductoCrear(BaseModel):
     codigo_barras: str
     nombre: str
-    precio: float
-    stock: int
+    precio_venta: float
+    existencia: int
 
     class Config:
         from_attributes = True
 
+class DetalleVenta(BaseModel):
+    total: float
+    productos_vendidos: str
 
-@app.get("/")
-def inicio():
-    return FileResponse("index.html")
+class DescuentoInventario(BaseModel):
+    cantidad: int
 
+app = FastAPI(title="Punto de Venta API")
 
-# 1. BUSCAR PRODUCTO
-@app.get("/buscar/{codigo_barras}")
-def buscar_producto(codigo_barras: str, db: Session = Depends(obtener_db)):
-    producto = db.query(ProductoTabla).filter(ProductoTabla.codigo_barras == codigo_barras).first()
-    if producto:
-        return producto
-    raise HTTPException(status_code=404, detail="Producto no encontrado")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
-# 2. AGREGAR PRODUCTO
-@app.post("/agregar/")
-def agregar_o_actualizar_producto(producto_datos: FormatoProducto, db: Session = Depends(obtener_db)):
-    # Buscamos si el código ya existe usando tus modelos de la base de datos
-    producto_existente = db.query(ProductoTabla).filter(ProductoTabla.codigo_barras == producto_datos.codigo_barras).first()
-    
-    if producto_existente:
-        # Si ya existe, sobreescribimos los valores con los nuevos datos
-        producto_existente.nombre = producto_datos.nombre
-        producto_existente.precio = producto_datos.precio
-        producto_existente.stock = producto_datos.stock  # Reemplaza el stock viejo por el nuevo
-        db.commit()
-        return {"mensaje": f"¡{producto_datos.nombre} actualizado con éxito!"}
-    
-    # Si es totalmente nuevo, lo registramos por primera vez
-    nuevo_producto = ProductoTabla(
-        codigo_barras=producto_datos.codigo_barras,
-        nombre=producto_datos.nombre,
-        precio=producto_datos.precio,
-        stock=producto_datos.stock
-    )
+@app.get("/productos/", response_model=list[ProductoCrear])
+def obtener_todos_los_productos(db: Session = Depends(get_db)):
+    return db.query(ProductoTabla).all()
+
+@app.get("/productos/buscar", response_model=ProductoCrear)
+def buscar_producto_por_nombre_o_codigo(q: str, db: Session = Depends(get_db)):
+    producto = db.query(ProductoTabla).filter(
+        or_(
+            ProductoTabla.codigo_barras == q,
+            ProductoTabla.nombre.ilike(f"%{q}%")
+        )
+    ).first()
+    if not producto:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return producto
+
+@app.post("/productos/", status_code=201)
+def registrar_producto(producto: ProductoCrear, db: Session = Depends(get_db)):
+    existe = db.query(ProductoTabla).filter(ProductoTabla.codigo_barras == producto.codigo_barras).first()
+    if existe:
+        raise HTTPException(status_code=400, detail="El código de barras ya existe")
+    nuevo_producto = ProductoTabla(**producto.dict())
     db.add(nuevo_producto)
     db.commit()
-    return {"mensaje": f"¡{producto_datos.nombre} registrado por primera vez!"}
+    db.refresh(nuevo_producto)
+    return nuevo_producto
 
+@app.put("/productos/{codigo_barras}")
+def actualizar_producto_existente(codigo_barras: str, producto_editado: ProductoCrear, db: Session = Depends(get_db)):
+    producto_db = db.query(ProductoTabla).filter(ProductoTabla.codigo_barras == codigo_barras).first()
+    if not producto_db:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    producto_db.nombre = producto_editado.nombre
+    producto_db.precio_venta = producto_editado.precio_venta
+    producto_db.existencia = producto_editado.existencia
+    db.commit()
+    db.refresh(producto_db)
+    return producto_db
 
-# 3. VENDER PRODUCTO (¡Ahora puedes poner cuántos se llevan!)
-@app.put("/vender/{codigo_barras}")
-def vender_producto(codigo_barras: str, cantidad: int = 1, db: Session = Depends(obtener_db)):
-    if cantidad <= 0:
-        raise HTTPException(status_code=400, detail="La cantidad a vender debe ser mayor a 0")
-
+@app.patch("/productos/{codigo_barras}/inventario")
+def descontar_inventario(codigo_barras: str, item: DescuentoInventario, db: Session = Depends(get_db)):
     producto = db.query(ProductoTabla).filter(ProductoTabla.codigo_barras == codigo_barras).first()
     if not producto:
-        raise HTTPException(status_code=404, detail="Producto no registrado")
-    
-    # Validamos si hay suficiente stock para cubrir la cantidad pedida
-    if producto.stock >= cantidad:
-        # Calculamos el dinero total de esta venta en particular
-        total_venta = producto.precio * cantidad
-        
-        # A) Restamos la cantidad al inventario
-        producto.stock -= cantidad
-        
-        # B) Registramos la venta con su cantidad y total correcto
-        nueva_venta = VentaTabla(
-            codigo_barras=producto.codigo_barras,
-            nombre_producto=producto.nombre,
-            cantidad=cantidad,
-            total=total_venta
-        )
-        db.add(nueva_venta)
-        db.commit()
-        db.refresh(producto)
-        
-        return {
-            "mensaje": f"¡Venta de {cantidad} pieza(s) procesada!",
-            "ticket": {
-                "producto": producto.nombre,
-                "cantidad_vendida": cantidad,
-                "total_cobrado": total_venta,
-                "inventario_restante": producto.stock
-            }
-        }
-        
-    raise HTTPException(status_code=400, detail=f"Stock insuficiente. Solo quedan {producto.stock} piezas")
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    if producto.existencia < item.cantidad:
+        raise HTTPException(status_code=400, detail="Existencias insuficientes")
+    producto.existencia -= item.cantidad
+    db.commit()
+    return {"mensaje": "Inventario rebajado", "nuevo_stock": producto.existencia}
 
+@app.post("/ventas/", status_code=201)
+def registrar_venta_historico(venta: DetalleVenta, db: Session = Depends(get_db)):
+    nueva_venta = VentaTabla(total=venta.total, productos_vendidos=venta.productos_vendidos)
+    db.add(nueva_venta)
+    db.commit()
+    db.refresh(nueva_venta)
+    return {"mensaje": "Venta guardada", "id_venta": nueva_venta.id}
 
-# 4. VER HISTORIAL DE VENTAS DETALLADO
-@app.get("/historial-ventas/")
-def ver_historial_ventas(db: Session = Depends(obtener_db)):
-    ventas = db.query(VentaTabla).all()
-    return {"ventas_totales": ventas}
-
-
-# 5. CORTE DE CAJA: GANANCIAS TOTALES (¡NUEVO!)
-@app.get("/corte-caja/")
-def obtener_corte_caja(db: Session = Depends(obtener_db)):
-    # Le pedimos a SQL que sume toda la columna 'total' de la tabla ventas
-    suma_total = db.query(func.sum(VentaTabla.total)).scalar()
-    
-    # Si la base de datos está vacía, la suma dará None. Lo convertimos a 0.0 para que se vea limpio
-    if suma_total is None:
-        suma_total = 0.0
-        
-    return {
-        "mensaje": "Corte de caja generado exitosamente",
-        "dinero_total_en_caja": suma_total
-    }
+@app.get("/cierre-caja/")
+def obtener_corte_del_dia(db: Session = Depends(get_db)):
+    hoy = datetime.now().date()
+    todas_las_ventas = db.query(VentaTabla).all()
+    total_hoy = 0.0
+    ventas_contador = 0
+    for v in todas_las_ventas:
+        if v.fecha.date() == hoy:
+            total_hoy += v.total
+            ventas_contador += 1
+    return {"fecha": str(hoy), "total_generado": total_hoy, "numero_ventas": ventas_contador}

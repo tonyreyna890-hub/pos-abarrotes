@@ -3,324 +3,439 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Abarrotes los cuñados - POS</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <title>Punto de Venta - Abarrotes</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-900 min-h-screen font-sans text-slate-100">
+<body class="bg-gray-100 min-h-screen font-sans">
 
-    <nav class="bg-slate-800 border-b border-slate-700 p-4 shadow-lg">
-        <div class="container mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div class="flex items-center space-x-3">
-                <span class="text-3xl">🏪</span>
-                <div>
-                    <h1 class="text-xl font-black tracking-wide text-emerald-400 uppercase">Abarrotes El Progreso</h1>
-                    <p class="text-xs text-slate-400 font-medium">Sistema de Control de Inventario v1.0</p>
-                </div>
-            </div>
+    <nav class="bg-blue-600 text-white shadow-md mb-6">
+        <div class="max-w-6xl mx-auto px-4 flex justify-between items-center h-16">
+            <h1 class="text-xl font-bold tracking-wide">📦 Sistema POS - Abarrotes</h1>
             <div class="flex space-x-2">
-                <button onclick="abrirModalInventario()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl font-bold transition shadow-md shadow-blue-950/50 active:scale-95 text-sm">
-                    📦 Inventario / Precios
+                <button onclick="cambiarPestaña('pestaña-mostrador')" id="btn-mostrador" class="px-4 py-2 rounded-md font-semibold bg-blue-700 text-white shadow cursor-pointer hover:bg-blue-500 transition-all duration-200">
+                    🛒 Mostrador (F1)
                 </button>
-                <button onclick="verCorte()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl font-bold transition shadow-md shadow-emerald-950/50 active:scale-95 text-sm">
-                    📊 Corte de Caja
+                <button onclick="cambiarPestaña('pestaña-inventario')" id="btn-inventario" class="px-4 py-2 rounded-md font-semibold cursor-pointer hover:bg-blue-500 transition-all duration-200">
+                    🔧 Inventario (F2)
+                </button>
+                <button onclick="obtenerCorteCaja()" class="px-4 py-2 bg-green-700 hover:bg-green-800 rounded-md font-semibold cursor-pointer transition-all duration-200">
+                    💰 Corte de Caja
                 </button>
             </div>
         </div>
     </nav>
 
-    <div class="container mx-auto p-4 max-w-5xl space-y-4">
-        
-        <div class="bg-slate-800 p-5 rounded-2xl border border-slate-700 shadow-xl">
-            <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Escáner de Código de Barras</label>
-            <div class="flex flex-col sm:flex-row gap-3">
-                <div class="relative flex-grow">
-                    <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-xl">🏷️</span>
-                    <input type="text" id="codigoInput" placeholder="Escanea o escribe el código de barras..." 
-                           class="w-full pl-12 pr-4 py-3.5 bg-slate-950 border border-slate-700 rounded-xl focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none text-lg font-mono text-emerald-400 placeholder-slate-600 transition"
-                           onkeypress="if(event.key === 'Enter') buscarProducto()">
+    <main class="max-w-6xl mx-auto px-4 pb-12">
+
+        <section id="pestaña-mostrador" class="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div class="md:col-span-3 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Buscar por Nombre o Código de Barras</label>
+                <div class="flex gap-2 mb-6">
+                    <input type="text" id="codigoBuscar" placeholder="Ej. Leche Lala o 123456789" class="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg">
+                    <button onclick="buscarProducto()" class="bg-blue-600 text-white px-6 py-2 rounded-md font-semibold hover:bg-blue-700 cursor-pointer transition">Buscar</button>
                 </div>
-                <button onclick="buscarProducto()" class="sm:w-44 bg-slate-700 hover:bg-slate-600 text-white font-bold px-6 py-3.5 rounded-xl transition active:scale-95 border border-slate-600">
-                    🔍 Buscar
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-100 text-gray-600 uppercase text-xs tracking-wider border-b">
+                                <th class="p-3">Producto</th>
+                                <th class="p-3">Precio</th>
+                                <th class="p-3 text-center">Cantidad</th>
+                                <th class="p-3">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaCarrito" class="divide-y divide-gray-100 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 h-fit flex flex-col justify-between">
+                <div>
+                    <h3 class="text-gray-500 font-bold uppercase text-xs tracking-wider mb-4">Resumen de Venta</h3>
+                    <div class="flex justify-between items-center border-t border-b py-4 my-4">
+                        <span class="text-lg font-bold text-gray-700">TOTAL:</span>
+                        <span id="totalVenta" class="text-3xl font-black text-green-600">$0.00</span>
+                    </div>
+                </div>
+                <button onclick="cobrarVenta()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold text-lg hover:bg-green-700 cursor-pointer shadow-md transition">
+                    💵 Cobrar Venta
                 </button>
             </div>
-            <div id="mensajeSistema" class="mt-3 p-3 rounded-xl hidden text-center font-bold text-sm transition-all"></div>
-        </div>
+        </section>
 
-        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div class="md:col-span-3 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl flex flex-col justify-between min-h-[300px]">
-                <div>
-                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-700">Artículo en Pantalla</h2>
-                    <div id="detalleProducto" class="space-y-4 hidden">
-                        <div>
-                            <p class="text-xs font-bold text-slate-500 uppercase">Descripción</p>
-                            <p class="text-3xl font-black text-white" id="prodNombre">---</p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4 pt-2">
-                            <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
-                                <p class="text-xs font-bold text-slate-500 uppercase">Precio Unitario</p>
-                                <p class="text-2xl font-black text-emerald-400" id="prodPrecio">$0.00</p>
-                            </div>
-                            <div class="bg-slate-900/50 p-3 rounded-xl border border-slate-700/50">
-                                <p class="text-xs font-bold text-slate-500 uppercase">Existencia actual</p>
-                                <p class="text-2xl font-bold text-slate-300"><span id="prodStock" class="font-black">0</span> pzas</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div id="sinProducto" class="text-center text-slate-600 py-16">
-                        <span class="text-5xl block mb-2">📥</span>
-                        Esperando lectura de mercancía...
-                    </div>
-                </div>
-            </div>
-
-            <div class="md:col-span-2 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl flex flex-col justify-between">
-                <div>
-                    <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-4 pb-2 border-b border-slate-700">Configurar Venta</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-400 mb-1.5">Cantidad a llevar:</label>
-                            <input type="number" id="cantidadVenta" value="1" min="1" 
-                                   class="w-full p-3 bg-slate-950 border border-slate-700 rounded-xl text-center font-black text-xl text-white outline-none focus:border-emerald-500">
-                        </div>
-                    </div>
-                </div>
-                <button id="btnVender" onclick="procesarVenta()" disabled 
-                        class="w-full mt-6 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white p-4 rounded-xl font-black text-xl transition-all shadow-lg shadow-emerald-950/50 cursor-pointer disabled:cursor-not-allowed uppercase tracking-wider">
-                    💸 Registrar Venta
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div id="modalInventario" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-md w-full shadow-2xl">
-            <div class="flex justify-between items-center mb-4 pb-2 border-b border-slate-700">
-                <h3 class="text-lg font-bold text-white flex items-center gap-2">📦 Control de Almacén</h3>
-                <button onclick="cerrarModalInventario()" class="text-slate-400 hover:text-white text-xl">✕</button>
-            </div>
-            
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Código de Barras (Presiona Enter)</label>
-                    <input type="text" id="invCodigo" placeholder="Escanea y pulsa Enter..."
-                           class="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl font-mono text-emerald-400 outline-none focus:border-blue-500 text-lg"
-                           onkeypress="if(event.key === 'Enter') buscarEnInventario()">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Nombre / Descripción</label>
-                    <input type="text" id="invNombre" placeholder="Ej. Sabritas Sal 45g" 
-                           class="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500 disabled:opacity-50">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
+        <section id="pestaña-inventario" class="hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 h-fit">
+                <h2 id="tituloFormInventario" class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">➕ Registrar Nuevo Producto</h2>
+                <form id="formProducto" onsubmit="registrarProducto(event)" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Precio ($)</label>
-                        <input type="number" id="invPrecio" step="0.01" placeholder="0.00" 
-                               class="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500 disabled:opacity-50">
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Código de Barras</label>
+                        <input type="text" id="regCodigo" oninput="comprobarCodigoManual()" required class="w-full px-3 py-2 border rounded-md font-mono">
                     </div>
                     <div>
-                        <label class="block text-xs font-bold text-slate-400 uppercase mb-1">Stock en Almacén</label>
-                        <input type="number" id="invStock" placeholder="0" 
-                               class="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white outline-none focus:border-blue-500 font-bold text-lg text-center">
+                        <label class="block text-sm font-medium text-gray-600 mb-1">Nombre del Producto</label>
+                        <input type="text" id="regNombre" required class="w-full px-3 py-2 border rounded-md">
                     </div>
-                </div>
-                
-                <button onclick="guardarProductoInventario()" class="w-full mt-2 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-bold transition shadow-lg uppercase tracking-wider text-sm">
-                    💾 Guardar Cambios
-                </button>
-                <div id="mensajeInventario" class="p-3 rounded-xl text-center font-bold text-xs hidden transition-all"></div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">Precio de Venta</label>
+                            <input type="number" id="regPrecio" step="0.01" required class="w-full px-3 py-2 border rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-600 mb-1">Existencia Real</label>
+                            <input type="number" id="regExistencia" required class="w-full px-3 py-2 border rounded-md">
+                        </div>
+                    </div>
+                    <button type="submit" id="btnGuardarInventario" class="w-full bg-blue-600 text-white py-2 rounded-md font-semibold hover:bg-blue-700 cursor-pointer transition">
+                        Guardar en Base de Datos
+                    </button>
+                    <button type="button" id="btnCancelarEdicion" onclick="limpiarFormularioInventario()" class="hidden w-full bg-gray-200 text-gray-700 mt-2 py-2 rounded-md font-semibold hover:bg-gray-300 transition">
+                        Cancelar Edición
+                    </button>
+                </form>
             </div>
-        </div>
-    </div>
 
-    <div id="modalCorte" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-800 border border-slate-700 p-6 rounded-2xl max-w-sm w-full text-center shadow-2xl">
-            <span class="text-4xl block mb-2">💵</span>
-            <h3 class="text-lg font-bold text-white mb-1">Corte de Caja</h3>
-            <p class="text-xs text-slate-400 mb-4">Total de efectivo acumulado en el sistema</p>
-            <div class="bg-slate-950 py-4 px-2 rounded-xl border border-slate-700 mb-6">
-                <p class="text-4xl font-black text-emerald-400 tracking-tight" id="montoCorte">$0.00</p>
+            <div class="md:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                <div class="sm:flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-lg font-bold text-gray-800">📋 Filtro de Almacén</h2>
+                    <input type="text" id="buscadorAlmacen" oninput="filtrarInventarioLocal(this.value)" placeholder="🔍 Filtrar por nombre..." class="px-3 py-1.5 border rounded-md text-sm w-full sm:w-64">
+                </div>
+                <div class="overflow-x-auto max-h-[450px]">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="text-gray-600 uppercase text-xs tracking-wider border-b">
+                                <th class="p-3">Código</th>
+                                <th class="p-3">Nombre</th>
+                                <th class="p-3">Precio</th>
+                                <th class="p-3 text-center">Stock</th>
+                                <th class="p-3 text-center">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaInventarioCompleto" class="divide-y divide-gray-100 text-sm"></tbody>
+                    </table>
+                </div>
             </div>
-            <button onclick="cerrarModal()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-xl font-bold transition">
-                Entendido
-            </button>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <script>
-        let codigoActual = "";
+        const API_URL = "http://127.0.0.1:8000";
+        let carrito = [];
+        let productosCache = []; 
 
-        function mostrarMensaje(texto, esError = false) {
-            const el = document.getElementById('mensajeSistema');
-            el.innerText = texto;
-            el.className = `mt-3 p-3 rounded-xl text-center font-bold text-sm ${esError ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`;
-            el.classList.remove('hidden');
-        }
+        function cambiarPestaña(pestañaId) {
+            document.getElementById('pestaña-mostrador').classList.add('hidden');
+            document.getElementById('pestaña-inventario').classList.add('hidden');
+            document.getElementById('btn-mostrador').classList.remove('bg-blue-700', 'shadow');
+            document.getElementById('btn-inventario').classList.remove('bg-blue-700', 'shadow');
 
-        function mostrarMensajeInv(texto, esError = false) {
-            const el = document.getElementById('mensajeInventario');
-            el.innerText = texto;
-            el.className = `p-2.5 rounded-xl text-center font-bold text-xs ${esError ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`;
-            el.classList.remove('hidden');
-        }
-
-        // CONTROL DE MODAL INVENTARIO
-        function abrirModalInventario() {
-            document.getElementById('modalInventario').classList.remove('hidden');
-            document.getElementById('invCodigo').focus();
-            // Desbloquear al inicio por defecto
-            document.getElementById('invNombre').disabled = false;
-            document.getElementById('invPrecio').disabled = false;
-        }
-        
-        function cerrarModalInventario() {
-            document.getElementById('modalInventario').classList.add('hidden');
-            document.getElementById('mensajeInventario').classList.add('hidden');
-            document.getElementById('invCodigo').value = "";
-            document.getElementById('invNombre').value = "";
-            document.getElementById('invPrecio').value = "";
-            document.getElementById('invStock').value = "";
-        }
-
-        // 🔥 NUEVA FUNCIÓN: BUSQUEDA INTERNA EN MODAL INVENTARIO
-        async function buscarEnInventario() {
-            const codigo = document.getElementById('invCodigo').value.trim();
-            if (!codigo) return;
-
-            try {
-                const respuesta = await fetch(`/buscar/${codigo}`);
-                
-                if (respuesta.status === 404) {
-                    // CASO: NO EXISTE EL PRODUCTO
-                    mostrarMensajeInv("⚠️ Código sin asignar / Producto inexistente. Completa los datos para dar de alta.", true);
-                    document.getElementById('invNombre').disabled = false;
-                    document.getElementById('invPrecio').disabled = false;
-                    document.getElementById('invNombre').value = "";
-                    document.getElementById('invPrecio').value = "";
-                    document.getElementById('invStock').value = "";
-                    document.getElementById('invNombre').focus();
-                    return;
-                }
-
-                // CASO: EL PRODUCTO SÍ EXISTE
-                const producto = await respuesta.json();
-                document.getElementById('invNombre').value = producto.nombre;
-                document.getElementById('invPrecio').value = producto.precio;
-                document.getElementById('invStock').value = producto.stock;
-                
-                // Bloquear campos de texto para evitar errores de captura
-                document.getElementById('invNombre').disabled = true;
-                document.getElementById('invPrecio').disabled = true;
-                
-                mostrarMensajeInv("🔍 Producto localizado. Modifica el stock directamente.");
-                document.getElementById('invStock').focus();
-                document.getElementById('invStock').select(); // Selecciona el número para sobreescribir rápido
-
-            } catch (err) {
-                mostrarMensajeInv("💥 Error al consultar la base de datos", true);
+            document.getElementById(pestañaId).classList.remove('hidden');
+            if (pestañaId === 'pestaña-mostrador') {
+                document.getElementById('btn-mostrador').classList.add('bg-blue-700', 'shadow');
+                document.getElementById('codigoBuscar').focus();
+            } else {
+                document.getElementById('btn-inventario').classList.add('bg-blue-700', 'shadow');
+                cargarInventarioCompleto();
             }
         }
 
-        // ACCIONES GENERALES
+        window.addEventListener('keydown', function(e) {
+            if (e.key === 'F1') { e.preventDefault(); cambiarPestaña('pestaña-mostrador'); }
+            if (e.key === 'F2') { e.preventDefault(); cambiarPestaña('pestaña-inventario'); }
+        });
+
         async function buscarProducto() {
-            const codigo = document.getElementById('codigoInput').value.trim();
-            if (!codigo) return;
+            const criterio = document.getElementById('codigoBuscar').value.trim();
+            if (!criterio) return;
 
             try {
-                const respuesta = await fetch(`/buscar/${codigo}`);
+                const respuesta = await fetch(`${API_URL}/productos/buscar?q=${encodeURIComponent(criterio)}`);
                 if (respuesta.status === 404) {
-                    mostrarMensaje("❌ Producto no registrado en el sistema", true);
-                    document.getElementById('detalleProducto').classList.add('hidden');
-                    document.getElementById('sinProducto').classList.remove('hidden');
-                    document.getElementById('btnVender').disabled = true;
+                    alert("❌ Producto no encontrado.");
+                    return;
+                }
+                const producto = await respuesta.json();
+
+                if (producto.existencia <= 0) {
+                    alert(`⚠️ Sin existencias para: ${producto.nombre}`);
                     return;
                 }
 
-                const producto = await respuesta.json();
-                codigoActual = producto.codigo_barras;
-                document.getElementById('prodNombre').innerText = producto.nombre;
-                document.getElementById('prodPrecio').innerText = `$${producto.precio.toFixed(2)}`;
-                document.getElementById('prodStock').innerText = producto.stock;
-                
-                document.getElementById('sinProducto').classList.add('hidden');
-                document.getElementById('detalleProducto').classList.remove('hidden');
-                document.getElementById('btnVender').disabled = producto.stock <= 0;
-                document.getElementById('mensajeSistema').classList.add('hidden');
-            } catch (err) {
-                mostrarMensaje("💥 Fallo de comunicación con el servidor", true);
-            }
+                agregarAlCarrito(producto);
+                document.getElementById('codigoBuscar').value = '';
+            } catch (error) { alert("❌ Error de conexión con el backend."); }
         }
 
-        async function guardarProductoInventario() {
-            const codigo = document.getElementById('invCodigo').value.trim();
-            const nombre = document.getElementById('invNombre').value.trim();
-            const precio = parseFloat(document.getElementById('invPrecio').value);
-            const stock = parseInt(document.getElementById('invStock').value);
+        function agregarAlCarrito(producto) {
+            const codigo = producto.codigo_barras;
+            const index = carrito.findIndex(item => item.codigo_barras === codigo);
 
-            if (!codigo || !nombre || isNaN(precio) || isNaN(stock)) {
-                mostrarMensajeInv("⚠️ Rellena todos los campos correctamente", true);
-                return;
+            if (index !== -1) {
+                if (carrito[index].cantidad < producto.existencia) {
+                    carrito[index].cantidad++;
+                } else { alert(`Máximo de stock alcanzado.`); }
+            } else {
+                carrito.push({ ...producto, cantidad: 1 });
             }
+            actualizarTablaHTML();
+        }
 
-            const paqueteDatos = {
-                codigo_barras: codigo,
-                nombre: nombre,
-                precio: precio,
-                stock: stock
-            };
+        function cambiarCantidad(codigo, cambio) {
+            const index = carrito.findIndex(item => item.codigo_barras === codigo);
+            if (index === -1) return;
+
+            carrito[index].cantidad += cambio;
+            if (carrito[index].cantidad <= 0) {
+                carrito.splice(index, 1);
+            } else if (carrito[index].cantidad > carrito[index].existencia) {
+                alert("No hay suficiente stock.");
+                carrito[index].cantidad = carrito[index].existencia;
+            }
+            actualizarTablaHTML();
+        }
+
+        function actualizarTablaHTML() {
+            const tbody = document.getElementById('tablaCarrito');
+            const totalSpan = document.getElementById('totalVenta');
+            tbody.innerHTML = '';
+            let totalGeneral = 0;
+
+            carrito.forEach(item => {
+                const precioReal = item.precio_venta || 0;
+                const subtotal = precioReal * item.cantidad;
+                totalGeneral += subtotal;
+
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100">
+                        <td class="p-3 font-medium text-gray-800">${item.nombre}</td>
+                        <td class="p-3">$${precioReal.toFixed(2)}</td>
+                        <td class="p-3 text-center flex items-center justify-center gap-2">
+                            <button onclick="cambiarCantidad('${item.codigo_barras}', -1)" class="bg-gray-200 text-gray-700 px-2 py-0.5 rounded hover:bg-gray-300 font-bold cursor-pointer">-</button>
+                            <span class="w-8 font-bold">${item.cantidad}</span>
+                            <button onclick="cambiarCantidad('${item.codigo_barras}', 1)" class="bg-gray-200 text-gray-700 px-2 py-0.5 rounded hover:bg-gray-300 font-bold cursor-pointer">+</button>
+                        </td>
+                        <td class="p-3 font-semibold text-gray-700">$${subtotal.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            totalSpan.innerText = `$${totalGeneral.toFixed(2)}`;
+        }
+
+        // 💵 COBRAR VENTA CON VENTANA EMERGENTE REDIMENSIONADA
+        async function cobrarVenta() {
+            if (carrito.length === 0) return alert("El carrito está vacío.");
+            
+            let totalGeneral = 0;
+            let resumenProductos = [];
+            let lineasProductosHTML = "";
+
+            carrito.forEach(item => {
+                const precioReal = item.precio_venta || 0;
+                const subtotal = precioReal * item.cantidad;
+                totalGeneral += subtotal;
+                resumenProductos.push(`${item.cantidad}x ${item.nombre}`);
+
+                lineasProductosHTML += `
+                    <tr>
+                        <td style="padding: 3px 0;">${item.cantidad} x ${item.nombre}</td>
+                        <td style="text-align: right; padding: 3px 0;">$${subtotal.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            const fechaActual = new Date().toLocaleString();
 
             try {
-                const respuesta = await fetch('/agregar/', {
+                for (const item of carrito) {
+                    await fetch(`${API_URL}/productos/${encodeURIComponent(item.codigo_barras)}/inventario`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ cantidad: item.cantidad })
+                    });
+                }
+
+                await fetch(`${API_URL}/ventas/`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(paqueteDatos)
+                    body: JSON.stringify({
+                        total: totalGeneral,
+                        productos_vendidos: resumenProductos.join(", ")
+                    })
                 });
 
-                if (respuesta.ok) {
-                    mostrarMensajeInv("✅ Base de datos guardada con éxito");
-                    setTimeout(cerrarModalInventario, 1200);
-                } else {
-                    const error = await respuesta.json();
-                    mostrarMensajeInv(`⚠️ Error: ${error.detail || 'No se pudo guardar'}`, true);
-                }
-            } catch (err) {
-                mostrarMensajeInv("💥 Error de red al conectar con el servidor", true);
+                // Ventana temporal optimizada para formato ticket de 80mm
+                const ventanaImpresion = window.open('', '_blank', 'width=300,height=600');
+                
+                ventanaImpresion.document.write(`
+                    <html>
+                    <head>
+                        <title>Imprimir Ticket</title>
+                        <style>
+                            @page { size: 80mm auto; margin: 0; }
+                            body { 
+                                font-family: 'Courier New', Courier, monospace; 
+                                font-size: 12px; 
+                                color: black; 
+                                padding: 10px; 
+                                width: 240px;
+                                margin: 0;
+                            }
+                            .centro { text-align: center; }
+                            .derecha { text-align: right; }
+                            .negrita { font-weight: bold; }
+                            .linea { border-bottom: 1px dashed black; margin: 6px 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="centro negrita" style="font-size: 14px;">🏪 TIENDA Y ABARROTES FAMILY</div>
+                        <div class="centro" style="font-size: 11px; margin-bottom: 5px;">¡Gracias por su preferencia!</div>
+                        <div class="linea"></div>
+                        <div>Fecha: ${fechaActual}</div>
+                        <div class="linea"></div>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 1px dashed black;">
+                                    <th style="text-align: left; padding-bottom: 4px;">DESCRIPCIÓN</th>
+                                    <th style="text-align: right; padding-bottom: 4px;">TOTAL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${lineasProductosHTML}
+                            </tbody>
+                        </table>
+                        <div class="linea"></div>
+                        <div class="derecha negrita" style="font-size: 14px;">
+                            TOTAL: $${totalGeneral.toFixed(2)}
+                        </div>
+                        <div class="centro" style="margin-top: 25px; font-size: 10px;">*** NO REEMBOLSABLE ***</div>
+                        <script>
+                            window.onload = function() {
+                                window.print();
+                                window.close();
+                            };
+                        <\/script>
+                    </body>
+                    </html>
+                `);
+                
+                ventanaImpresion.document.close();
+
+                carrito = [];
+                actualizarTablaHTML();
+
+            } catch (error) { 
+                alert("❌ Error al procesar la venta en el servidor."); 
             }
         }
 
-        async function procesarVenta() {
-            const cantidad = document.getElementById('cantidadVenta').value;
+        async function cargarInventarioCompleto() {
             try {
-                const respuesta = await fetch(`/vender/${codigoActual}?cantidad=${cantidad}`, { method: 'PUT' });
-                const resultado = await respuesta.json();
-
-                if (!respuesta.ok) {
-                    mostrarMensaje(`⚠️ ${resultado.detail}`, true);
-                    return;
-                }
-
-                mostrarMensaje(`🛒 ¡Venta procesada con éxito!`);
-                document.getElementById('codigoInput').value = "";
-                document.getElementById('codigoInput').focus();
-                buscarProducto();
-            } catch (err) {
-                mostrarMensaje("💥 Error fatal al registrar la venta", true);
-            }
+                const respuesta = await fetch(`${API_URL}/productos/`);
+                productosCache = await respuesta.json();
+                renderizarTablaInventario(productosCache);
+            } catch (error) { console.error(error); }
         }
 
-        async function verCorte() {
+        function renderizarTablaInventario(lista) {
+            const tbody = document.getElementById('tablaInventarioCompleto');
+            tbody.innerHTML = '';
+            lista.forEach(p => {
+                tbody.innerHTML += `
+                    <tr class="hover:bg-gray-50 border-b border-gray-100">
+                        <td class="p-3 font-mono text-gray-600">${p.codigo_barras}</td>
+                        <td class="p-3 font-medium text-gray-800">${p.nombre}</td>
+                        <td class="p-3 text-gray-700">$${p.precio_venta.toFixed(2)}</td>
+                        <td class="p-3 text-center font-bold ${p.existencia <= 3 ? 'text-red-500 bg-red-50' : 'text-gray-700'}">${p.existencia} pza</td>
+                        <td class="p-3 text-center">
+                            <button type="button" onclick="autorellenarFormulario('${p.codigo_barras}')" class="bg-blue-50 text-blue-600 px-3 py-1 rounded-md text-xs font-bold hover:bg-blue-600 hover:text-white cursor-pointer transition">
+                                ✏️ Editar
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function filtrarInventarioLocal(texto) {
+            const t = texto.toLowerCase().trim();
+            const filtrados = productosCache.filter(p => 
+                p.nombre.toLowerCase().includes(t) || p.codigo_barras.includes(t)
+            );
+            renderizarTablaInventario(filtrados);
+        }
+
+        function autorellenarFormulario(codigo) {
+            const p = productosCache.find(item => item.codigo_barras === codigo);
+            if (!p) return;
+
+            document.getElementById('regCodigo').value = p.codigo_barras;
+            document.getElementById('regNombre').value = p.nombre;
+            document.getElementById('regPrecio').value = p.precio_venta;
+            document.getElementById('regExistencia').value = p.existencia;
+
+            document.getElementById('tituloFormInventario').innerText = "🔄 Editar Producto Existente";
+            document.getElementById('btnGuardarInventario').className = "w-full bg-amber-500 text-white py-2 rounded-md font-semibold hover:bg-amber-600 cursor-pointer transition";
+            document.getElementById('btnGuardarInventario').innerText = "Actualizar Valores";
+            document.getElementById('btnCancelarEdicion').classList.remove('hidden');
+            document.getElementById('regExistencia').focus();
+        }
+
+        function comprobarCodigoManual() {
+            const codigo = document.getElementById('regCodigo').value.trim();
+            const p = productosCache.find(item => item.codigo_barras === codigo);
+            if (p) autorellenarFormulario(codigo);
+        }
+
+        function limpiarFormularioInventario() {
+            document.getElementById('formProducto').reset();
+            document.getElementById('tituloFormInventario').innerText = "➕ Registrar Nuevo Producto";
+            document.getElementById('btnGuardarInventario').className = "w-full bg-blue-600 text-white py-2 rounded-md font-semibold hover:bg-blue-700 cursor-pointer transition";
+            document.getElementById('btnGuardarInventario').innerText = "Guardar en Base de Datos";
+            document.getElementById('btnCancelarEdicion').classList.add('hidden');
+        }
+
+        async function registrarProducto(event) {
+            event.preventDefault();
+            const codigo = document.getElementById('regCodigo').value.trim();
+            const datos = {
+                codigo_barras: codigo,
+                nombre: document.getElementById('regNombre').value.trim(),
+                precio_venta: parseFloat(document.getElementById('regPrecio').value) || 0.0,
+                existencia: parseInt(document.getElementById('regExistencia').value) || 0
+            };
+
+            const esEdicion = document.getElementById('btnGuardarInventario').innerText.includes("Actualizar");
+
             try {
-                const respuesta = await fetch('/corte-caja/');
-                const datos = await respuesta.json();
-                document.getElementById('montoCorte').innerText = `$${datos.dinero_total_en_caja.toFixed(2)}`;
-                document.getElementById('modalCorte').classList.remove('hidden');
-            } catch (err) {
-                alert("Error al conectar con el balance");
-            }
+                let url = esEdicion ? `${API_URL}/productos/${encodeURIComponent(codigo)}` : `${API_URL}/productos/`;
+                let metodo = esEdicion ? 'PUT' : 'POST';
+
+                let respuesta = await fetch(url, {
+                    method: metodo,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(datos)
+                });
+
+                if (respuesta.ok || respuesta.status === 201) {
+                    alert("✅ Guardado correctamente.");
+                    limpiarFormularioInventario();
+                    cargarInventarioCompleto();
+                } else { alert("❌ Detalle al guardar."); }
+            } catch (error) { alert("❌ Error de comunicación."); }
         }
 
-        function cerrarModal() {
-            document.getElementById('modalCorte').classList.add('hidden');
+        async function obtenerCorteCaja() {
+            try {
+                const respuesta = await fetch(`${API_URL}/cierre-caja/`);
+                const corte = await respuesta.json();
+                alert(`📋 CORTE DE CAJA DEL DÍA\n\n📅 Fecha: ${corte.fecha}\n🛒 Número de Ventas: ${corte.numero_ventas}\n💰 Total en Caja: $${corte.total_generado.toFixed(2)}`);
+            } catch (error) { alert("❌ Error al conectar con el cierre de caja."); }
         }
+
+        document.getElementById('codigoBuscar').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') buscarProducto();
+        });
+        document.getElementById('codigoBuscar').focus();
     </script>
 </body>
 </html>
